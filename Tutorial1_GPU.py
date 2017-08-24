@@ -26,7 +26,7 @@ def print_logging_device():
     # Runs the op.
     print sess.run(c)
 
-print_logging_device()
+#print_logging_device()
 
 
 
@@ -49,9 +49,89 @@ def matrix_mul(device_name, matrix_sizes):
     return time_values
 
 
-matrix_sizes = range(100,3000,100)
-time_values_gpu = matrix_mul("/gpu:0", matrix_sizes)
-time_values_cpu = matrix_mul("/cpu:0", matrix_sizes)
-print ("GPU time" +  str(time_values_gpu))
-print ("CPUtime" + str(time_values_cpu))
+#matrix_sizes = range(100,3000,100)
+#time_values_gpu = matrix_mul("/gpu:0", matrix_sizes)
+#time_values_cpu = matrix_mul("/cpu:0", matrix_sizes)
+#print ("GPU time" +  str(time_values_gpu))
+#print ("CPUtime" + str(time_values_cpu))
 print "--------------------------------"
+
+
+print "------- Multi GPU ---------"
+def multi_gpu():
+    c = []
+    for d in ['/cpu','/gpu:0', '/gpu:1','/gpu:2', '/gpu:3']:
+      with tf.device(d):
+        a = tf.ones(shape=[3,3], dtype=tf.float32)
+        b = tf.ones(shape=[3,3], dtype=tf.float32)
+        c.append(tf.matmul(a, b))
+    with tf.device('/cpu:0'):
+      sum = tf.add_n(c)
+    sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+    print(sess.run(sum))
+    
+#multi_gpu()
+print "--------------------------------"
+# https://github.com/aymericdamien/TensorFlow-Examples/blob/master/examples/5_MultiGPU/multigpu_basics.py
+
+def single_gpu_sum(matrix_size ,n):
+    
+    # Create a graph to store results
+    comp = []
+
+    def matpow(M, n):
+        if n < 1: 
+            return M
+        else:
+            return tf.matmul(M, matpow(M, n-1))
+
+    for d in ['/gpu:0', '/gpu:1','/gpu:2', '/gpu:3']:
+        with tf.device('/gpu:0'):
+            A = np.random.rand(matrix_size, matrix_size).astype('float32')
+        
+            # Compute A^n and B^n and store results in c1
+            comp.append(matpow(A, n))
+
+    with tf.device('/cpu:0'):
+      sum = tf.add_n(comp) #Addition of all elements in c1, i.e. A^n + B^n
+
+    startTime = datetime.now()
+    with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
+        sess.run(sum)
+    td = datetime.now() - startTime
+    #print ("n:" + str(n) + "  -- time: "+str(td))
+    return td
+
+def multi_gpu_sum(matrix_size ,n):
+    
+    # Create a graph to store results
+    comp = []
+
+    def matpow(M, n):
+        if n < 1: 
+            return M
+        else:
+            return tf.matmul(M, matpow(M, n-1))
+        
+    for d in ['/gpu:0', '/gpu:1','/gpu:2', '/gpu:3']:
+        with tf.device(d):
+            A = np.random.rand(matrix_size, matrix_size).astype('float32')
+            comp.append(matpow(A, n))
+
+    with tf.device('/cpu:0'):
+      sum = tf.add_n(comp) #Addition of all elements in c1, i.e. A^n + B^n
+
+    startTime = datetime.now()
+    with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
+        sess.run(sum)
+    td = datetime.now() - startTime
+    #print ("n:" + str(n) + "  -- time: "+str(td))
+    return td
+    
+
+
+
+single_gpu = str(single_gpu_sum(1000 ,10))
+multi_gpu = str(multi_gpu_sum(1000 ,10))
+print single_gpu
+print multi_gpu
